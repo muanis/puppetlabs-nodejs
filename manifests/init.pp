@@ -10,7 +10,8 @@
 #
 class nodejs(
   $dev_package = false,
-  $proxy       = ''
+  $proxy       = '',
+  $npm_from_source = true,
 ) inherits nodejs::params {
 
   case $::operatingsystem {
@@ -69,10 +70,29 @@ class nodejs(
     require => Anchor['nodejs::repo']
   }
 
-  package { 'npm':
-    name    => $nodejs::params::npm_pkg,
-    ensure  => present,
-    require => Anchor['nodejs::repo']
+  if $npm_from_source {
+    exec { 'download_npm_installer':
+      cwd     => "/tmp",
+      command => "/usr/bin/curl -o install.sh https://npmjs.org/install.sh",
+      creates => "/tmp/install.sh",
+      logoutput => 'on_failure',
+    }
+
+    exec { 'npm_installer':
+      cwd     => "/tmp",
+      command => "/bin/sh /tmp/install.sh",
+      creates => "/usr/bin/npm",
+      environment => 'clean=yes',
+      require => Exec['download_npm_installer'],
+      logoutput => 'on_failure',
+    }
+
+  } else {
+    package { 'npm':
+      name    => $nodejs::params::npm_pkg,
+      ensure  => present,
+      require => Anchor['nodejs::repo']
+    }
   }
 
   if $proxy {
